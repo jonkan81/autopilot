@@ -1,0 +1,98 @@
+esphome:
+  name: autopilot
+  platform: ESP8266
+  board: nodemcuv2
+  includes:
+    - udpsensor.h
+  libraries: ESPAsyncUDP
+
+#logger:
+
+wifi:
+  ssid: !secret ssid
+  password: !secret ssidpw
+  fast_connect: true #hidden ssid
+
+
+http_request:
+  useragent: esphome/device
+  timeout: 10s
+
+remote_receiver:
+  pin: D3
+  tolerance: 60%
+  filter: 4us
+  idle: 4ms
+
+binary_sensor:
+  - platform: remote_receiver
+    name: RF Button Keyfob1
+    rc_switch_raw:
+      protocol: 1
+      code: "111111110101111101110001"
+    filters:
+      - delayed_off: 100ms
+    on_press:
+      - http_request.send:
+          method: POST
+          url: http://192.168.42.1:3000/plugins/anchoralarm/raiseAnchor
+      - http_request.send:
+          method: POST
+          url: http://192.168.42.1:3000/plugins/alarmsilencer/clearNotification
+          headers:
+            Content-Type: application/json
+          json:
+            path: notifications.navigation.anchor
+  - platform: remote_receiver
+    name: RF Button Keyfob2
+    rc_switch_raw:
+      protocol: 1
+      code: "111010111000100001101000"
+    filters:
+      - delayed_off: 100ms
+    on_press:
+      - http_request.send:
+          method: POST
+          url: http://192.168.42.1:3000/plugins/anchoralarm/dropAnchor
+  - platform: remote_receiver
+    name: RF Button Keyfob3
+    rc_switch_raw:
+      protocol: 1
+      code: "111111110101111101110010"
+    filters:
+      - delayed_off: 100ms
+    on_press:
+      - http_request.send:
+          method: POST
+          url: http://192.168.42.1:3000/plugins/alarmsilencer/clearNotification
+          headers:
+            Content-Type: application/json
+          json:
+            path: notifications.navigation.anchor
+  - platform: remote_receiver
+    name: RF Button Keyfob4
+    rc_switch_raw:
+      protocol: 1
+      code: "111111110101111101111000"
+    filters:
+      - delayed_off: 100ms
+
+uart:
+  tx_pin: GPIO01
+  baud_rate: 9600
+
+text_sensor:
+- platform: custom
+  lambda: |-
+    auto udp_sensor = new UdpSensor();
+    App.register_component(udp_sensor);
+    return {udp_sensor};
+
+  text_sensors:
+    name: "udp"
+
+    on_value:
+      then:
+        - uart.write: !lambda
+            return std::vector<unsigned char>( x.begin(), x.end() );
+    
